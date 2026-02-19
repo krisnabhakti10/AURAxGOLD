@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/verify?login=...&server=...
  * Header: x-ea-key: <EA_VERIFY_API_KEY>

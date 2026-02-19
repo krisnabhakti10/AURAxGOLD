@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
+export const dynamic = "force-dynamic";
+
 function checkAdminAuth(req: NextRequest): boolean {
   const pass = req.headers.get("x-admin-pass");
   const adminPassword = process.env.ADMIN_PASSWORD;
