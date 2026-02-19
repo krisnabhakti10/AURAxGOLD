@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.licenses (
   login       bigint      NOT NULL,
   server      text        NOT NULL,
   broker      text        NULL,
+  whatsapp    text        NULL,
   status      text        NOT NULL DEFAULT 'pending'
                           CHECK (status IN ('pending','approved','rejected','revoked')),
   plan_days   int         NOT NULL DEFAULT 30
@@ -43,3 +44,4 @@ COMMENT ON COLUMN public.licenses.status IS 'pending | approved | rejected | rev
 COMMENT ON COLUMN public.licenses.plan_days IS '30 or 90 days subscription';
 COMMENT ON COLUMN public.licenses.login IS 'MT5 account login number';
 COMMENT ON COLUMN public.licenses.server IS 'MT5 broker server name';
+COMMENT ON COLUMN public.licenses.whatsapp IS 'User WhatsApp number for admin contact';

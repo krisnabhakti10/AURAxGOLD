@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 const requestSchema = z.object({
   email: z.string().email("Email tidak valid"),
+  whatsapp: z.string().max(20).optional(),
   login: z
     .number({ invalid_type_error: "Login harus berupa angka" })
     .int("Login harus bilangan bulat")
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { email, login, server, broker, planDays } = parsed.data;
+    const { email, whatsapp, login, server, broker, planDays } = parsed.data;
 
     // Check if record already exists
     const { data: existing, error: selectErr } = await supabaseAdmin
@@ -70,6 +71,7 @@ export async function POST(req: NextRequest) {
         .from("licenses")
         .update({
           email,
+          whatsapp: whatsapp ?? null,
           broker: broker ?? null,
           plan_days: planDays,
           status: "pending",
@@ -97,6 +99,7 @@ export async function POST(req: NextRequest) {
     // Insert new record
     const { error: insertErr } = await supabaseAdmin.from("licenses").insert({
       email,
+      whatsapp: whatsapp ?? null,
       login,
       server,
       broker: broker ?? null,
