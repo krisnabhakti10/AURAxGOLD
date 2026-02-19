@@ -1,0 +1,261 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+
+type FormState = {
+  email: string;
+  login: string;
+  server: string;
+  broker: string;
+  planDays: "30" | "90";
+};
+
+type SubmitState = "idle" | "loading" | "success" | "error";
+
+/* ─── Small helpers ────────────────────────────────────── */
+function BackLink() {
+  return (
+    <Link href="/"
+      className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-zinc-200 text-xs font-medium mb-8 transition-colors duration-200 group">
+      <svg className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform duration-200"
+        fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+      Kembali ke Beranda
+    </Link>
+  );
+}
+
+function FieldWrapper({ label, hint, required, children }: {
+  label: string; hint?: string; required?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="field-label">
+        {label}
+        {required && <span className="text-gold-500 ml-0.5">*</span>}
+        {!required && <span className="text-zinc-600 font-normal ml-1.5 text-[11px]">(opsional)</span>}
+      </label>
+      {children}
+      {hint && <p className="field-hint">{hint}</p>}
+    </div>
+  );
+}
+
+/* ─── Page ──────────────────────────────────────────────── */
+export default function ActivatePage() {
+  const [form, setForm] = useState<FormState>({
+    email: "", login: "", server: "", broker: "", planDays: "30",
+  });
+  const [state, setState]     = useState<SubmitState>("idle");
+  const [message, setMessage] = useState("");
+
+  const onChange = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setState("loading");
+    setMessage("");
+
+    try {
+      const res  = await fetch("/api/request-activation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email:    form.email.trim(),
+          login:    Number(form.login),
+          server:   form.server.trim(),
+          broker:   form.broker.trim() || undefined,
+          planDays: Number(form.planDays),
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setState("error");
+        setMessage(data.error ?? "Terjadi kesalahan. Silakan coba lagi.");
+        return;
+      }
+      setState("success");
+      setMessage(data.message ?? "Permintaan aktivasi berhasil dikirim! Admin akan memverifikasi dalam 1×24 jam.");
+      setForm({ email: "", login: "", server: "", broker: "", planDays: "30" });
+    } catch {
+      setState("error");
+      setMessage("Gagal menghubungi server. Periksa koneksi Anda.");
+    }
+  };
+
+  const isLoading = state === "loading";
+
+  return (
+    <div className="min-h-[80vh] flex items-start justify-center px-5 sm:px-8 py-12">
+
+      {/* Ambient glow */}
+      <div className="pointer-events-none fixed inset-0"
+        style={{ background: "radial-gradient(ellipse 60% 35% at 50% 0%, rgba(217,119,6,0.07) 0%, transparent 65%)" }} />
+
+      <div className="relative w-full max-w-[480px]">
+        <BackLink />
+
+        {/* Page header */}
+        <div className="mb-8">
+          <div className="page-badge mb-4">
+            <span className="page-badge-dot" />
+            Permintaan Aktivasi
+          </div>
+          <h1 className="text-[2rem] font-bold tracking-tight text-white leading-tight mb-2">
+            Ajukan{" "}
+            <span className="text-gold-gradient">Aktivasi Lisensi</span>
+          </h1>
+          <p className="text-zinc-500 text-sm leading-relaxed">
+            Isi data MT5 Anda di bawah. Pastikan sudah mendaftar via IB link kami sebelum mengajukan.
+          </p>
+        </div>
+
+        {/* Main card */}
+        <div className="card-glass p-6 sm:p-8">
+
+          {/* Success */}
+          {state === "success" && (
+            <div className="alert-success mb-6">
+              <svg className="w-4 h-4 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+              </svg>
+              <div>
+                <p className="font-semibold text-green-300 mb-0.5">Permintaan Terkirim!</p>
+                <p className="text-green-400/80 text-[12px] leading-relaxed">{message}</p>
+                <Link href="/status" className="inline-flex items-center gap-1 text-gold-400 hover:text-gold-300 text-[12px] mt-2 font-medium transition-colors">
+                  Cek status lisensi
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          {state === "error" && (
+            <div className="alert-error mb-6">
+              <svg className="w-4 h-4 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+              </svg>
+              <div>
+                <p className="font-semibold text-red-300 mb-0.5">Gagal Mengirim</p>
+                <p className="text-red-400/80 text-[12px] leading-relaxed">{message}</p>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={onSubmit} className="space-y-5">
+
+            {/* Email */}
+            <FieldWrapper label="Email" required hint="Gunakan email aktif untuk notifikasi">
+              <input type="email" name="email" value={form.email} onChange={onChange}
+                placeholder="contoh@email.com" required className="input-field" />
+            </FieldWrapper>
+
+            {/* Login & Server - 2 col on sm+ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FieldWrapper label="MT5 Login" required hint="Hanya angka">
+                <input type="text" name="login" value={form.login} onChange={onChange}
+                  placeholder="12345678" required pattern="[0-9]+" title="Hanya angka"
+                  className="input-field" />
+              </FieldWrapper>
+              <FieldWrapper label="MT5 Server" required hint="Nama server broker">
+                <input type="text" name="server" value={form.server} onChange={onChange}
+                  placeholder="BrokerName-Server" required className="input-field" />
+              </FieldWrapper>
+            </div>
+
+            {/* Broker */}
+            <FieldWrapper label="Nama Broker" required={false}>
+              <input type="text" name="broker" value={form.broker} onChange={onChange}
+                placeholder="XM, ICMarkets, Exness…" className="input-field" />
+            </FieldWrapper>
+
+            {/* Plan selector */}
+            <div className="space-y-2">
+              <label className="field-label">
+                Paket Berlangganan <span className="text-gold-500">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {(["30", "90"] as const).map((d) => {
+                  const selected = form.planDays === d;
+                  return (
+                    <label key={d}
+                      className={`relative flex flex-col items-center justify-center p-4 rounded-xl cursor-pointer transition-all duration-200 select-none ${
+                        selected
+                          ? "bg-gold-500/[0.07] border border-gold-500/40 shadow-[0_0_20px_rgba(245,158,11,0.1)]"
+                          : "bg-white/[0.02] border border-white/[0.07] hover:border-white/[0.12] hover:bg-white/[0.04]"
+                      }`}>
+                      <input type="radio" name="planDays" value={d}
+                        checked={selected} onChange={onChange} className="sr-only" />
+                      {/* Check dot */}
+                      <span className={`absolute top-2.5 right-2.5 w-4 h-4 rounded-full border flex items-center justify-center transition-all duration-200 ${
+                        selected ? "border-gold-500 bg-gold-500" : "border-white/15"
+                      }`}>
+                        {selected && (
+                          <svg className="w-2.5 h-2.5 text-black" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                          </svg>
+                        )}
+                      </span>
+                      <span className={`text-3xl font-bold leading-none mb-1 transition-colors ${selected ? "text-gold-400" : "text-zinc-400"}`}>
+                        {d}
+                      </span>
+                      <span className={`text-[11px] font-medium transition-colors ${selected ? "text-gold-500" : "text-zinc-600"}`}>
+                        hari
+                      </span>
+                      {d === "90" && (
+                        <span className="mt-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gold-500/15 text-gold-400 border border-gold-500/20">
+                          Hemat
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="divider" />
+
+            {/* Submit */}
+            <button type="submit" disabled={isLoading} className="btn-gold w-full py-3.5 text-[15px]">
+              {isLoading ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  Mengirim Permintaan…
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                  </svg>
+                  Kirim Permintaan Aktivasi
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        {/* Info note */}
+        <div className="mt-4 flex items-start gap-2.5 px-4 py-3.5 rounded-xl border border-white/[0.05] bg-white/[0.015]">
+          <svg className="w-4 h-4 text-zinc-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <p className="text-[12px] text-zinc-600 leading-relaxed">
+            Aktivasi hanya berlaku untuk kombinasi MT5 Login + Server yang didaftarkan.
+            Perubahan akun memerlukan pengajuan ulang.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
