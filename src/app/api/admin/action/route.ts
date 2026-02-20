@@ -83,14 +83,21 @@ export async function POST(req: NextRequest) {
   switch (action) {
     case "approve": {
       const now = new Date();
-      const expiresAt = new Date(now);
-      expiresAt.setDate(expiresAt.getDate() + (record.plan_days as number));
+      const isLifetime = (record.plan_days as number) === 0;
+      let expiresIso: string | null = null;
+      let expLabel = "Selamanya (Lifetime)";
+      if (!isLifetime) {
+        const expiresAt = new Date(now);
+        expiresAt.setDate(expiresAt.getDate() + (record.plan_days as number));
+        expiresIso = expiresAt.toISOString();
+        expLabel = `Berlaku hingga ${expiresAt.toLocaleDateString("id-ID")}`;
+      }
       updatePayload = {
         status: "approved",
         approved_at: now.toISOString(),
-        expires_at: expiresAt.toISOString(),
+        expires_at: expiresIso,
       };
-      successMessage = `Lisensi berhasil disetujui. Berlaku hingga ${expiresAt.toLocaleDateString("id-ID")}.`;
+      successMessage = `Lisensi berhasil disetujui. ${expLabel}.`;
       break;
     }
     case "reject": {

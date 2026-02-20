@@ -6,7 +6,7 @@ import Footer from "@/components/Footer";
 export const metadata: Metadata = {
   title: "AURAxGOLD — MT5 EA Licensing Portal",
   description:
-    "Portal lisensi resmi AURAxGOLD EA untuk MetaTrader 5. Daftar via IB link, ajukan aktivasi, dan nikmati performa trading premium.",
+    "Portal lisensi resmi AURAxGOLD EA untuk MetaTrader 5. Buat akun Exness, ajukan aktivasi, dan nikmati performa trading premium.",
   keywords: ["AURAxGOLD", "MT5 EA", "Expert Advisor", "Lisensi", "Trading"],
   openGraph: {
     title: "AURAxGOLD — MT5 EA Licensing Portal",

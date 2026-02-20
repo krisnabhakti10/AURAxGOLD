@@ -1,20 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getExnessToken, checkExnessAffiliation } from "@/lib/exnessApi";
 
 export const dynamic = "force-dynamic";
 
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+
+function calcExpiresAt(planDays: number): Date | null {
+  if (planDays === 0) return null; // Lifetime
+  const d = new Date();
+  d.setDate(d.getDate() + planDays);
+  return d;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Request Schema
+// ─────────────────────────────────────────────────────────────
+
 const requestSchema = z.object({
-  email: z.string().email("Email tidak valid"),
+  email:    z.string().email("Email tidak valid"),
   whatsapp: z.string().max(20).optional(),
   login: z
     .number({ invalid_type_error: "Login harus berupa angka" })
     .int("Login harus bilangan bulat")
     .positive("Login harus positif"),
-  server: z.string().min(2, "Server minimal 2 karakter").max(100),
-  broker: z.string().max(100).optional(),
-  planDays: z.union([z.literal(30), z.literal(90)]).default(30),
+  server:   z.string().min(2, "Server minimal 2 karakter").max(100),
+  broker:   z.string().max(100).optional(),
+  planDays: z.union([z.literal(0), z.literal(30), z.literal(90)]).default(30),
+  skipAffiliationCheck: z.boolean().optional(),
 });
+
+// ─────────────────────────────────────────────────────────────
+// POST Handler
+// ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,16 +51,51 @@ export async function POST(req: NextRequest) {
 
     const parsed = requestSchema.safeParse(body);
     if (!parsed.success) {
-      const firstError = parsed.error.errors[0];
       return NextResponse.json(
-        { error: firstError?.message ?? "Input tidak valid." },
+        { error: parsed.error.errors[0]?.message ?? "Input tidak valid." },
         { status: 400 }
       );
     }
 
-    const { email, whatsapp, login, server, broker, planDays } = parsed.data;
+    const { email, whatsapp, login, server, broker, planDays, skipAffiliationCheck } =
+      parsed.data;
 
-    // Check if record already exists
+    // ── Verifikasi & Auto-Approve via Exness API ───────────────
+    let autoApprove  = false;
+    let clientUid: string | null = null;
+
+    if (!skipAffiliationCheck) {
+      try {
+        const result = await checkExnessAffiliation(email);
+
+        if (!result.affiliated) {
+          return NextResponse.json(
+            {
+              error:
+                "Email ini belum terdaftar sebagai klien kami di Exness. " +
+                "Silakan buat akun Exness terlebih dahulu melalui link resmi kami, " +
+                "lalu gunakan email yang sama untuk aktivasi.",
+              code: "NOT_AFFILIATED",
+            },
+            { status: 422 }
+          );
+        }
+
+        // Email terverifikasi → set auto-approve
+        autoApprove = true;
+        clientUid   = result.clientUid;
+      } catch (affiliErr) {
+        // Jika Exness API down → fallback ke manual approve
+        console.warn("[request-activation] Exness check error (fallback to manual):", affiliErr);
+      }
+    }
+
+    const now        = new Date();
+    const expiresAt  = autoApprove ? calcExpiresAt(planDays) : null;
+    const status     = autoApprove ? "approved" : "pending";
+    const approvedAt = autoApprove ? now.toISOString() : null;
+
+    // ── Cek record existing ────────────────────────────────────
     const { data: existing, error: selectErr } = await supabaseAdmin
       .from("licenses")
       .select("id, status")
@@ -56,7 +112,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (existing) {
-      // Allow re-submission only if rejected or revoked
       if (existing.status === "pending" || existing.status === "approved") {
         return NextResponse.json(
           {
@@ -66,18 +121,20 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Update existing rejected/revoked record to pending
+      // Update record yang sudah ada (rejected / revoked)
       const { error: updateErr } = await supabaseAdmin
         .from("licenses")
         .update({
           email,
-          whatsapp: whatsapp ?? null,
-          broker: broker ?? null,
-          plan_days: planDays,
-          status: "pending",
-          expires_at: null,
-          approved_at: null,
-          note: null,
+          whatsapp:       whatsapp ?? null,
+          broker:         broker ?? null,
+          plan_days:      planDays,
+          status,
+          expires_at:     expiresAt ? expiresAt.toISOString() : null,
+          approved_at:    approvedAt,
+          note:           null,
+          client_uid:     clientUid,
+          exness_status:  autoApprove ? "ACTIVE" : null,
         })
         .eq("id", existing.id);
 
@@ -91,25 +148,34 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message:
-          "Permintaan aktivasi ulang berhasil dikirim. Admin akan memverifikasi dalam 1×24 jam.",
+        autoApproved: autoApprove,
+        message: autoApprove
+          ? `Aktivasi berhasil! Lisensi EA kamu sudah aktif${
+              planDays === 0
+                ? " selamanya (Lifetime)."
+                : ` hingga ${expiresAt!.toLocaleDateString("id-ID")}.`
+            }`
+          : "Permintaan aktivasi ulang berhasil dikirim. Admin akan memverifikasi dalam 1×24 jam.",
       });
     }
 
-    // Insert new record
+    // ── Insert record baru ────────────────────────────────────
     const { error: insertErr } = await supabaseAdmin.from("licenses").insert({
       email,
-      whatsapp: whatsapp ?? null,
+      whatsapp:       whatsapp ?? null,
       login,
       server,
-      broker: broker ?? null,
-      plan_days: planDays,
-      status: "pending",
+      broker:         broker ?? null,
+      plan_days:      planDays,
+      status,
+      expires_at:     expiresAt ? expiresAt.toISOString() : null,
+      approved_at:    approvedAt,
+      client_uid:     clientUid,
+      exness_status:  autoApprove ? "ACTIVE" : null,
     });
 
     if (insertErr) {
       console.error("[request-activation] insert error:", insertErr);
-      // Handle unique constraint (race condition)
       if (insertErr.code === "23505") {
         return NextResponse.json(
           { error: "Login MT5 ini sudah terdaftar. Silakan cek status Anda." },
@@ -124,8 +190,14 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message:
-        "Permintaan aktivasi berhasil dikirim! Admin akan memverifikasi dalam 1×24 jam.",
+      autoApproved: autoApprove,
+      message: autoApprove
+        ? `Aktivasi berhasil! Lisensi EA kamu sudah aktif${
+            planDays === 0
+              ? " selamanya (Lifetime)."
+              : ` hingga ${expiresAt!.toLocaleDateString("id-ID")}.`
+          }`
+        : "Permintaan aktivasi berhasil dikirim! Admin akan memverifikasi dalam 1×24 jam.",
     });
   } catch (err) {
     console.error("[request-activation] unexpected error:", err);

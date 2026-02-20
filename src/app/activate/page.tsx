@@ -9,10 +9,10 @@ type FormState = {
   login: string;
   server: string;
   broker: string;
-  planDays: "30" | "90";
+  planDays: "0" | "30" | "90";
 };
 
-type SubmitState = "idle" | "loading" | "success" | "error";
+type SubmitState = "idle" | "loading" | "success" | "error" | "not_affiliated";
 
 /* ─── Small helpers ────────────────────────────────────── */
 function BackLink() {
@@ -49,8 +49,15 @@ export default function ActivatePage() {
   const [form, setForm] = useState<FormState>({
     email: "", whatsapp: "", login: "", server: "", broker: "", planDays: "30",
   });
-  const [state, setState]     = useState<SubmitState>("idle");
-  const [message, setMessage] = useState("");
+
+  const PLANS: { value: "0" | "30" | "90"; label: string; sub: string; badge?: string }[] = [
+    { value: "30",  label: "30",       sub: "hari"     },
+    { value: "90",  label: "90",       sub: "hari",    badge: "Hemat"    },
+    { value: "0",   label: "∞",        sub: "Lifetime", badge: "Permanen" },
+  ];
+  const [state, setState]       = useState<SubmitState>("idle");
+  const [message, setMessage]   = useState("");
+  const [autoApproved, setAutoApproved] = useState(false);
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -76,13 +83,20 @@ export default function ActivatePage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setState("error");
+        // Kasus khusus: email belum terdaftar via link Exness kita
+        if (data.code === "NOT_AFFILIATED") {
+          setState("not_affiliated");
+        } else {
+          setState("error");
+        }
         setMessage(data.error ?? "Terjadi kesalahan. Silakan coba lagi.");
         return;
       }
       setState("success");
       setMessage(data.message ?? "Permintaan aktivasi berhasil dikirim! Admin akan memverifikasi dalam 1×24 jam.");
       setForm({ email: "", whatsapp: "", login: "", server: "", broker: "", planDays: "30" });
+      // Tandai apakah ini auto-approve
+      setAutoApproved(data.autoApproved === true);
     } catch {
       setState("error");
       setMessage("Gagal menghubungi server. Periksa koneksi Anda.");
@@ -112,15 +126,36 @@ export default function ActivatePage() {
             <span className="text-gold-gradient">Aktivasi Lisensi</span>
           </h1>
           <p className="text-zinc-500 text-sm leading-relaxed">
-            Isi data MT5 Anda di bawah. Pastikan sudah mendaftar via IB link kami sebelum mengajukan.
+            Isi data MT5 Anda di bawah. Pastikan sudah membuat akun Exness melalui link resmi kami sebelum mengajukan.
           </p>
         </div>
 
         {/* Main card */}
         <div className="card-glass p-6 sm:p-8">
 
-          {/* Success */}
-          {state === "success" && (
+          {/* Success — Auto Approved */}
+          {state === "success" && autoApproved && (
+            <div className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.06] p-4">
+              <div className="flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                  <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-semibold text-emerald-300 mb-0.5">✅ Lisensi Aktif Sekarang!</p>
+                  <p className="text-emerald-400/80 text-[12px] leading-relaxed mb-2">{message}</p>
+                  <p className="text-zinc-500 text-[11px] mb-2">EA kamu sudah bisa digunakan. Salin lisensi key dari halaman status.</p>
+                  <Link href="/status" className="inline-flex items-center gap-1 text-gold-400 hover:text-gold-300 text-[12px] font-semibold transition-colors">
+                    Lihat Lisensi Saya →
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Success — Manual Pending */}
+          {state === "success" && !autoApproved && (
             <div className="alert-success mb-6">
               <svg className="w-4 h-4 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
@@ -138,7 +173,36 @@ export default function ActivatePage() {
             </div>
           )}
 
-          {/* Error */}
+          {/* Error — Not Affiliated (belum daftar via link Exness) */}
+          {state === "not_affiliated" && (
+            <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-4">
+              <div className="flex gap-3">
+                <svg className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-amber-300 mb-1 text-sm">Akun Exness Belum Terdeteksi</p>
+                  <p className="text-amber-400/80 text-[12px] leading-relaxed mb-3">{message}</p>
+                  <a
+                    href="https://one.exnessonelink.com/a/dk95kv8jji"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-black text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-colors duration-200"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                    </svg>
+                    Buat Akun Exness Sekarang
+                  </a>
+                  <p className="text-zinc-600 text-[11px] mt-2">
+                    Setelah daftar, kembali ke sini dan ajukan aktivasi dengan email yang sama.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error — General */}
           {state === "error" && (
             <div className="alert-error mb-6">
               <svg className="w-4 h-4 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -196,21 +260,26 @@ export default function ActivatePage() {
               <label className="field-label">
                 Paket Berlangganan <span className="text-gold-500">*</span>
               </label>
-              <div className="grid grid-cols-2 gap-3">
-                {(["30", "90"] as const).map((d) => {
-                  const selected = form.planDays === d;
+              <div className="grid grid-cols-3 gap-3">
+                {PLANS.map((plan) => {
+                  const selected = form.planDays === plan.value;
+                  const isLifetime = plan.value === "0";
                   return (
-                    <label key={d}
+                    <label key={plan.value}
                       className={`relative flex flex-col items-center justify-center p-4 rounded-xl cursor-pointer transition-all duration-200 select-none ${
                         selected
-                          ? "bg-gold-500/[0.07] border border-gold-500/40 shadow-[0_0_20px_rgba(245,158,11,0.1)]"
+                          ? isLifetime
+                            ? "bg-purple-500/[0.07] border border-purple-500/40 shadow-[0_0_20px_rgba(168,85,247,0.1)]"
+                            : "bg-gold-500/[0.07] border border-gold-500/40 shadow-[0_0_20px_rgba(245,158,11,0.1)]"
                           : "bg-white/[0.02] border border-white/[0.07] hover:border-white/[0.12] hover:bg-white/[0.04]"
                       }`}>
-                      <input type="radio" name="planDays" value={d}
+                      <input type="radio" name="planDays" value={plan.value}
                         checked={selected} onChange={onChange} className="sr-only" />
                       {/* Check dot */}
                       <span className={`absolute top-2.5 right-2.5 w-4 h-4 rounded-full border flex items-center justify-center transition-all duration-200 ${
-                        selected ? "border-gold-500 bg-gold-500" : "border-white/15"
+                        selected
+                          ? isLifetime ? "border-purple-500 bg-purple-500" : "border-gold-500 bg-gold-500"
+                          : "border-white/15"
                       }`}>
                         {selected && (
                           <svg className="w-2.5 h-2.5 text-black" fill="currentColor" viewBox="0 0 20 20">
@@ -218,15 +287,27 @@ export default function ActivatePage() {
                           </svg>
                         )}
                       </span>
-                      <span className={`text-3xl font-bold leading-none mb-1 transition-colors ${selected ? "text-gold-400" : "text-zinc-400"}`}>
-                        {d}
+                      <span className={`text-3xl font-bold leading-none mb-1 transition-colors ${
+                        selected
+                          ? isLifetime ? "text-purple-400" : "text-gold-400"
+                          : "text-zinc-400"
+                      }`}>
+                        {plan.label}
                       </span>
-                      <span className={`text-[11px] font-medium transition-colors ${selected ? "text-gold-500" : "text-zinc-600"}`}>
-                        hari
+                      <span className={`text-[11px] font-medium transition-colors ${
+                        selected
+                          ? isLifetime ? "text-purple-500" : "text-gold-500"
+                          : "text-zinc-600"
+                      }`}>
+                        {plan.sub}
                       </span>
-                      {d === "90" && (
-                        <span className="mt-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gold-500/15 text-gold-400 border border-gold-500/20">
-                          Hemat
+                      {plan.badge && (
+                        <span className={`mt-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
+                          isLifetime
+                            ? "bg-purple-500/15 text-purple-400 border-purple-500/20"
+                            : "bg-gold-500/15 text-gold-400 border-gold-500/20"
+                        }`}>
+                          {plan.badge}
                         </span>
                       )}
                     </label>

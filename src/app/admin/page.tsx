@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 
 /* ─── Types ─────────────────────────────────────────────── */
 type LicenseStatus = "pending" | "approved" | "rejected" | "revoked";
@@ -20,6 +20,48 @@ interface License {
   note: string | null;
   created_at: string;
   approved_at: string | null;
+  client_uid: string | null;
+  exness_status: string | null;
+}
+
+/* ─── Exness Types ──────────────────────────────────────── */
+type MainTab = "licenses" | "exness";
+
+interface ExnessClient {
+  client_uid: string;
+  reg_date: string;
+  client_country: string;
+  client_status: string;
+  volume_lots: number;
+  volume_mln_usd: number;
+  reward_usd: string;
+  trade_fn: string | null;
+  kyc_passed: boolean;
+  ftd_received: boolean;
+  ftt_made: boolean;
+  balance_label: string;
+  equity_label: string;
+  deposit_label: string;
+  last_week_failed_deposit_count: number;
+}
+
+interface ExnessStats {
+  fetched_at: string;
+  partner_link: { full_default_link: string; code: string } | null;
+  wallet: { accounts: { id: string; currency: string; balance: number; type: string }[]; total_balance_usd: number };
+  summary: {
+    total_clients: number;
+    active_clients: number;
+    inactive_clients: number;
+    kyc_passed: number;
+    ftd_received: number;
+    trading_active: number;
+    volume_lots: number;
+    volume_mln_usd: number;
+    reward_usd: string;
+    server_dt: string | null;
+  };
+  clients: ExnessClient[];
 }
 
 /* ─── Helpers ───────────────────────────────────────────── */
@@ -184,6 +226,13 @@ export default function AdminPage() {
   const [tab, setTab]       = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
 
+  /* ── Exness Monitor ── */
+  const [mainTab, setMainTab]         = useState<MainTab>("licenses");
+  const [exStats, setExStats]         = useState<ExnessStats | null>(null);
+  const [exLoading, setExLoading]     = useState(false);
+  const [exError, setExError]         = useState("");
+  const [exSearch, setExSearch]       = useState("");
+
   const showToast = (type: "success" | "error", msg: string) => {
     setToast({ type, msg });
     setTimeout(() => setToast(null), 3500);
@@ -215,6 +264,24 @@ export default function AdminPage() {
     } catch { showToast("error", "Gagal menghubungi server."); }
     finally { setActionLoading(null); }
   };
+
+  const fetchExnessStats = useCallback(async (pass: string) => {
+    setExLoading(true); setExError("");
+    try {
+      const res  = await fetch("/api/admin/exness-stats", { headers: { "x-admin-password": pass } });
+      const data = await res.json();
+      if (!res.ok) { setExError(data.error ?? "Gagal memuat data Exness."); return; }
+      setExStats(data as ExnessStats);
+    } catch { setExError("Gagal menghubungi server."); }
+    finally { setExLoading(false); }
+  }, []);
+
+  // Auto-load Exness data ketika tab Exness dibuka untuk pertama kali
+  useEffect(() => {
+    if (mainTab === "exness" && authed && !exStats && !exLoading) {
+      fetchExnessStats(password);
+    }
+  }, [mainTab, authed, exStats, exLoading, password, fetchExnessStats]);
 
   /* ── Derived counts (client-side expired logic) ── */
   const counts: Record<FilterTab, number> = useMemo(() => ({
@@ -279,20 +346,248 @@ export default function AdminPage() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button onClick={() => fetchLicenses(password)} disabled={fetchLoading}
+            <button
+              onClick={() => mainTab === "licenses" ? fetchLicenses(password) : fetchExnessStats(password)}
+              disabled={fetchLoading || exLoading}
               className="btn-ghost text-xs py-1.5 px-3">
-              <svg className={`w-3.5 h-3.5 ${fetchLoading ? "animate-spin" : ""}`}
+              <svg className={`w-3.5 h-3.5 ${(fetchLoading || exLoading) ? "animate-spin" : ""}`}
                 fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
               </svg>
               Refresh
             </button>
-            <button onClick={() => { setAuthed(false); setPassword(""); setLicenses([]); }}
+            <button onClick={() => { setAuthed(false); setPassword(""); setLicenses([]); setExStats(null); }}
               className="btn-ghost text-xs py-1.5 px-3 text-red-400/70 hover:text-red-400 hover:border-red-400/20">
               Keluar
             </button>
           </div>
         </div>
+
+        {/* ══════════════════ MAIN TAB SWITCHER ══════════════════ */}
+        <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-6 w-fit">
+          {([
+            { key: "licenses", label: "📋 Manajemen Lisensi" },
+            { key: "exness",   label: "📊 Exness Monitor" },
+          ] as { key: MainTab; label: string }[]).map(({ key, label }) => (
+            <button key={key} onClick={() => setMainTab(key)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                mainTab === key
+                  ? "bg-gold-500/15 text-gold-300 border border-gold-500/25"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ══════════════════ EXNESS MONITOR PANEL ══════════════════ */}
+        {mainTab === "exness" && (
+          <div className="space-y-6">
+
+            {/* Loading */}
+            {exLoading && (
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <Spinner className="w-7 h-7 text-gold-400" />
+                <p className="text-zinc-500 text-sm">Mengambil data dari Exness…</p>
+              </div>
+            )}
+
+            {/* Error */}
+            {exError && !exLoading && (
+              <div className="alert-error">
+                <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                </svg>
+                <div>
+                  <p className="font-semibold text-red-300 text-sm mb-0.5">Gagal memuat data Exness</p>
+                  <p className="text-red-400/70 text-[12px]">{exError}</p>
+                </div>
+              </div>
+            )}
+
+            {exStats && !exLoading && (
+              <>
+                {/* ─── Timestamp & Partner Link ─── */}
+                <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-zinc-500 text-xs">
+                      Data per: {fmtDate(exStats.fetched_at)}
+                    </span>
+                  </div>
+                  {exStats.partner_link && (
+                    <a href={exStats.partner_link.full_default_link} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-gold-400/80 hover:text-gold-300 transition-colors border border-gold-500/20 bg-gold-500/5 px-3 py-1.5 rounded-lg">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                      </svg>
+                      Link Afiliasi: {exStats.partner_link.code}
+                    </a>
+                  )}
+                </div>
+
+                {/* ─── Summary Cards ─── */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+                  {[
+                    { label: "Total Klien",   value: exStats.summary.total_clients,  color: "text-zinc-200",    icon: "👥" },
+                    { label: "Aktif",         value: exStats.summary.active_clients,  color: "text-emerald-400", icon: "✅" },
+                    { label: "Inactive",      value: exStats.summary.inactive_clients,color: "text-red-400",     icon: "🔴" },
+                    { label: "KYC Verified",  value: exStats.summary.kyc_passed,      color: "text-blue-400",    icon: "🪪" },
+                    { label: "Sudah Deposit", value: exStats.summary.ftd_received,    color: "text-purple-400",  icon: "💰" },
+                    { label: "Sudah Trading", value: exStats.summary.trading_active,  color: "text-amber-400",   icon: "📈" },
+                    { label: "Volume (Lot)",  value: exStats.summary.volume_lots.toFixed(2), color: "text-gold-400", icon: "📊" },
+                    { label: "Reward (USD)",  value: `$${parseFloat(exStats.summary.reward_usd).toFixed(2)}`, color: "text-emerald-300", icon: "🏆" },
+                  ].map(({ label, value, color, icon }) => (
+                    <div key={label} className="stat-card flex flex-col gap-1">
+                      <span className="text-lg">{icon}</span>
+                      <p className={`text-lg font-bold leading-none ${color}`}>{value}</p>
+                      <p className="text-[10px] text-zinc-600 font-medium leading-tight">{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ─── Wallet Balance ─── */}
+                {exStats.wallet.accounts.length > 0 && (
+                  <div className="card-glass p-4">
+                    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-3">💳 Wallet Partner</p>
+                    <div className="flex flex-wrap gap-3">
+                      {exStats.wallet.accounts.map((acc) => (
+                        <div key={acc.id} className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2">
+                          <span className="text-xs text-zinc-500">{acc.type}</span>
+                          <span className="text-sm font-bold text-white">${acc.balance.toFixed(2)}</span>
+                          <span className="text-[10px] text-zinc-600">{acc.currency}</span>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2 bg-emerald-500/5 border border-emerald-500/20 rounded-lg px-3 py-2">
+                        <span className="text-xs text-zinc-500">Total</span>
+                        <span className="text-sm font-bold text-emerald-400">${exStats.wallet.total_balance_usd.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ─── Client Table ─── */}
+                <div className="card-glass p-4 sm:p-6">
+                  <div className="flex items-center justify-between gap-4 mb-4">
+                    <p className="text-sm font-semibold text-white">Daftar Klien Exness</p>
+                    <input
+                      type="text" placeholder="Cari client_uid…"
+                      value={exSearch} onChange={e => setExSearch(e.target.value)}
+                      className="input-field text-xs py-1.5 px-3 w-48"
+                    />
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Client UID</th>
+                          <th>Daftar</th>
+                          <th>Negara</th>
+                          <th>Status</th>
+                          <th>KYC</th>
+                          <th>Deposit</th>
+                          <th>Trading</th>
+                          <th>Volume (lot)</th>
+                          <th>Reward</th>
+                          <th>Saldo</th>
+                          <th>Last Trade</th>
+                          <th>Failed Dep</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {exStats.clients
+                          .filter(c => !exSearch || c.client_uid.includes(exSearch.toLowerCase()))
+                          .map((c) => (
+                            <tr key={c.client_uid}>
+                              {/* UID */}
+                              <td>
+                                <span className="font-mono text-[11px] text-zinc-400 truncate block max-w-[120px]"
+                                  title={c.client_uid}>
+                                  {c.client_uid.slice(0, 8)}…
+                                </span>
+                              </td>
+                              {/* Reg date */}
+                              <td><span className="text-[12px] text-zinc-500">{c.reg_date}</span></td>
+                              {/* Country */}
+                              <td><span className="chip">{c.client_country}</span></td>
+                              {/* Status */}
+                              <td>
+                                {c.client_status === "ACTIVE" ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-2 py-0.5 rounded-full">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                    ACTIVE
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-400 bg-red-400/10 border border-red-400/20 px-2 py-0.5 rounded-full">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                                    INACTIVE
+                                  </span>
+                                )}
+                              </td>
+                              {/* KYC */}
+                              <td className="text-center">
+                                {c.kyc_passed
+                                  ? <span className="text-emerald-400 text-base">✓</span>
+                                  : <span className="text-zinc-600 text-base">✗</span>}
+                              </td>
+                              {/* FTD */}
+                              <td className="text-center">
+                                {c.ftd_received
+                                  ? <span className="text-emerald-400 text-base">✓</span>
+                                  : <span className="text-zinc-600 text-base">✗</span>}
+                              </td>
+                              {/* Trading */}
+                              <td className="text-center">
+                                {c.ftt_made
+                                  ? <span className="text-emerald-400 text-base">✓</span>
+                                  : <span className="text-zinc-600 text-base">✗</span>}
+                              </td>
+                              {/* Volume */}
+                              <td>
+                                <span className={`text-[12px] font-medium ${c.volume_lots > 0 ? "text-gold-400" : "text-zinc-600"}`}>
+                                  {c.volume_lots.toFixed(2)}
+                                </span>
+                              </td>
+                              {/* Reward */}
+                              <td>
+                                <span className={`text-[12px] font-medium ${parseFloat(c.reward_usd) > 0 ? "text-emerald-400" : "text-zinc-600"}`}>
+                                  ${parseFloat(c.reward_usd).toFixed(2)}
+                                </span>
+                              </td>
+                              {/* Balance range */}
+                              <td><span className="chip">{c.balance_label}</span></td>
+                              {/* Last trade */}
+                              <td>
+                                <span className="text-[12px] text-zinc-500">{c.trade_fn ?? "—"}</span>
+                              </td>
+                              {/* Failed deposits */}
+                              <td>
+                                <span className={`text-[12px] font-medium ${c.last_week_failed_deposit_count > 0 ? "text-orange-400" : "text-zinc-600"}`}>
+                                  {c.last_week_failed_deposit_count}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        }
+                        {exStats.clients.length === 0 && (
+                          <tr>
+                            <td colSpan={12} className="text-center py-8 text-zinc-600 text-sm">
+                              Belum ada data klien
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ══════════════════ LICENSES PANEL ══════════════════ */}
+        {mainTab === "licenses" && (
+        <div className="space-y-0">
 
         {/* ══════════════════ STAT CARDS ══════════════════ */}
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-6">
@@ -485,6 +780,7 @@ export default function AdminPage() {
                     <th>Broker</th>
                     <th>Paket</th>
                     <th>Status</th>
+                    <th>Exness</th>
                     <th>Berlaku Hingga</th>
                     <th>Dibuat</th>
                     <th className="text-right">Aksi</th>
@@ -556,15 +852,49 @@ export default function AdminPage() {
                         </td>
                         {/* Plan */}
                         <td>
-                          <span className="chip">{lic.plan_days}d</span>
+                          {lic.plan_days === 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                              </svg>
+                              Lifetime
+                            </span>
+                          ) : (
+                            <span className="chip">{lic.plan_days}d</span>
+                          )}
                         </td>
                         {/* Status */}
                         <td><StatusBadge lic={lic} /></td>
+                        {/* Exness Status */}
+                        <td>
+                          {lic.exness_status === "ACTIVE" ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-2 py-0.5 rounded-full">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              ACTIVE
+                            </span>
+                          ) : lic.exness_status === "INACTIVE" ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-400 bg-red-400/10 border border-red-400/20 px-2 py-0.5 rounded-full">
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                              INACTIVE
+                            </span>
+                          ) : lic.exness_status === "NOT_FOUND" ? (
+                            <span className="text-[11px] text-orange-400">Not Found</span>
+                          ) : (
+                            <span className="text-zinc-700 text-[12px]">—</span>
+                          )}
+                        </td>
                         {/* Expiry */}
                         <td className="whitespace-nowrap">
                           {lic.expires_at ? (
                             <span className={`text-[12px] ${expired ? "text-orange-400" : eff === "approved" ? "text-green-400" : "text-zinc-600"}`}>
                               {fmtDate(lic.expires_at)}
+                            </span>
+                          ) : lic.plan_days === 0 && lic.status === "approved" ? (
+                            <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-purple-400">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                              </svg>
+                              Selamanya
                             </span>
                           ) : (
                             <span className="text-zinc-700 text-[12px]">—</span>
@@ -621,6 +951,9 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+        </div>
+        )}
+
       </div>
     </div>
   );

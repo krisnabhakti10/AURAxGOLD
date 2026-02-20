@@ -9,8 +9,8 @@ const STEPS = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
       </svg>
     ),
-    title: "Daftar via IB Link",
-    desc: "Buka akun trading MT5 menggunakan link IB resmi kami. Proses pendaftaran cepat dan mudah.",
+    title: "Buat Akun Exness",
+    desc: "Buka akun trading MT5 melalui Exness menggunakan link resmi kami. Proses pendaftaran cepat dan mudah.",
     link: "https://one.exnessonelink.com/a/dk95kv8jji",
     linkLabel: "Buat Akun Exness →",
   },
@@ -175,7 +175,7 @@ export default function LandingPage() {
             <span className="text-gold-400 font-semibold">XAUUSD</span>
           </p>
           <p className="text-zinc-500 text-sm sm:text-base max-w-xl mx-auto mb-12 leading-relaxed">
-            Sistem trading otomatis berbasis algoritma cerdas. Daftar via IB link,
+            Sistem trading otomatis berbasis algoritma cerdas. Buat akun Exness,
             ajukan aktivasi, dan biarkan EA bekerja untuk Anda 24/7.
           </p>
 
@@ -387,7 +387,7 @@ export default function LandingPage() {
                 Siap Trading dengan EA Premium?
               </h2>
               <p className="text-zinc-400 text-sm mb-8 max-w-lg mx-auto leading-relaxed">
-                Daftarkan akun MT5 Anda via IB link kami, lalu ajukan aktivasi.
+                Daftarkan akun MT5 Exness Anda menggunakan link resmi kami, lalu ajukan aktivasi.
                 Persetujuan biasanya selesai dalam 1×24 jam.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">

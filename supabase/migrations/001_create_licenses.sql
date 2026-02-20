@@ -9,12 +9,14 @@ CREATE TABLE IF NOT EXISTS public.licenses (
   email       text        NOT NULL,
   login       bigint      NOT NULL,
   server      text        NOT NULL,
-  broker      text        NULL,
-  whatsapp    text        NULL,
-  status      text        NOT NULL DEFAULT 'pending'
+  broker        text        NULL,
+  whatsapp      text        NULL,
+  client_uid    text        NULL,
+  exness_status text        NULL,
+  status        text        NOT NULL DEFAULT 'pending'
                           CHECK (status IN ('pending','approved','rejected','revoked')),
   plan_days   int         NOT NULL DEFAULT 30
-                          CHECK (plan_days IN (30, 90)),
+                          CHECK (plan_days IN (0, 30, 90)),
   expires_at  timestamptz NULL,
   note        text        NULL,
   created_at  timestamptz NOT NULL DEFAULT now(),
@@ -28,6 +30,7 @@ CREATE INDEX IF NOT EXISTS idx_licenses_status     ON public.licenses (status);
 CREATE INDEX IF NOT EXISTS idx_licenses_expires_at ON public.licenses (expires_at);
 CREATE INDEX IF NOT EXISTS idx_licenses_login_server ON public.licenses (login, server);
 CREATE INDEX IF NOT EXISTS idx_licenses_created_at ON public.licenses (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_licenses_client_uid  ON public.licenses (client_uid) WHERE client_uid IS NOT NULL;
 
 -- Enable Row Level Security
 ALTER TABLE public.licenses ENABLE ROW LEVEL SECURITY;
@@ -41,7 +44,9 @@ ALTER TABLE public.licenses ENABLE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE public.licenses IS 'MT5 EA license records for AURAxGOLD licensing portal';
 COMMENT ON COLUMN public.licenses.status IS 'pending | approved | rejected | revoked';
-COMMENT ON COLUMN public.licenses.plan_days IS '30 or 90 days subscription';
+COMMENT ON COLUMN public.licenses.plan_days IS '0 = lifetime, 30 or 90 days subscription';
 COMMENT ON COLUMN public.licenses.login IS 'MT5 account login number';
 COMMENT ON COLUMN public.licenses.server IS 'MT5 broker server name';
 COMMENT ON COLUMN public.licenses.whatsapp IS 'User WhatsApp number for admin contact';
+COMMENT ON COLUMN public.licenses.client_uid IS 'Exness client UID dari Partnership API affiliation check';
+COMMENT ON COLUMN public.licenses.exness_status IS 'Status klien di Exness: ACTIVE | INACTIVE (di-sync via cron)';
