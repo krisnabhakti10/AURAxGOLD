@@ -310,6 +310,85 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ═══════════════════════════ LIVE ACCOUNT ═══════════════════════════ */}
+      <section className="py-16 px-5 sm:px-8">
+        <div className="max-w-3xl mx-auto">
+
+          <div className="text-center mb-10">
+            <p className="section-eyebrow mb-3">Transparansi</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-3">
+              Akun <span className="text-gold-gradient">Live Trading</span>
+            </h2>
+            <p className="text-zinc-500 text-sm max-w-md mx-auto">
+              Monitor performa EA kami secara langsung. Gunakan kredensial investor (read-only) di bawah ini untuk memantau akun live kami melalui MetaTrader 5.
+            </p>
+          </div>
+
+          <div className="relative rounded-2xl overflow-hidden"
+            style={{
+              background: "linear-gradient(135deg, rgba(20,14,0,0.95) 0%, rgba(10,8,0,0.98) 100%)",
+              border: "1px solid rgba(245,158,11,0.25)",
+              boxShadow: "0 0 50px rgba(245,158,11,0.06), inset 0 1px 0 rgba(245,158,11,0.08)",
+            }}>
+
+            {/* Top glow */}
+            <div className="pointer-events-none absolute top-0 left-0 right-0 h-px"
+              style={{ background: "linear-gradient(90deg, transparent, rgba(245,158,11,0.4), transparent)" }} />
+
+            {/* Header bar */}
+            <div className="flex items-center gap-3 px-6 py-4 border-b"
+              style={{ borderColor: "rgba(245,158,11,0.1)", background: "rgba(245,158,11,0.03)" }}>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-red-500/70" />
+                <span className="w-3 h-3 rounded-full bg-yellow-500/70" />
+                <span className="w-3 h-3 rounded-full bg-green-500/70" />
+              </div>
+              <div className="flex items-center gap-2 ml-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-xs font-semibold text-zinc-400 tracking-wide">LIVE ACCOUNT — INVESTOR ACCESS</span>
+              </div>
+            </div>
+
+            {/* Credentials grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x"
+              style={{ divideColor: "rgba(245,158,11,0.1)" }}>
+
+              {/* Login */}
+              <div className="px-6 py-6 flex flex-col gap-1.5">
+                <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-600">Login ID</p>
+                <p className="text-xl font-mono font-bold text-gold-400 tracking-wider select-all">257261514</p>
+                <p className="text-[11px] text-zinc-600">MT5 Account Number</p>
+              </div>
+
+              {/* Server */}
+              <div className="px-6 py-6 flex flex-col gap-1.5">
+                <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-600">Server</p>
+                <p className="text-base font-mono font-bold text-zinc-200 tracking-wide select-all">Exness-MT5Real36</p>
+                <p className="text-[11px] text-zinc-600">Broker Server</p>
+              </div>
+
+              {/* Password */}
+              <div className="px-6 py-6 flex flex-col gap-1.5">
+                <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-600">Kata Sandi Investor</p>
+                <p className="text-base font-mono font-bold text-zinc-200 tracking-wide select-all">AURAxGOLD1@</p>
+                <p className="text-[11px] text-zinc-600">Read-only · Tidak bisa trading</p>
+              </div>
+            </div>
+
+            {/* Info bar */}
+            <div className="px-6 py-3.5 border-t flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4"
+              style={{ borderColor: "rgba(245,158,11,0.1)", background: "rgba(245,158,11,0.02)" }}>
+              <div className="flex items-center gap-2 text-[11px] text-zinc-600">
+                <svg className="w-3.5 h-3.5 text-gold-500/60 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Buka MetaTrader 5 → File → Login → masukkan data di atas untuk melihat history trading secara real-time.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ═══════════════════════════════ VPS ════════════════════════════════ */}
       <section className="py-10 px-5 sm:px-8">
         <div className="max-w-6xl mx-auto">
