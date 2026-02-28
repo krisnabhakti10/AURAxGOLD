@@ -350,8 +350,7 @@ export default function LandingPage() {
             </div>
 
             {/* Credentials grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x"
-              style={{ divideColor: "rgba(245,158,11,0.1)" }}>
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.06]">
 
               {/* Login */}
               <div className="px-6 py-6 flex flex-col gap-1.5">
