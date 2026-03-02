@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 
 const NAV = [
-  { href: "/",        label: "Beranda"    },
-  { href: "/activate", label: "Aktivasi"  },
-  { href: "/status",   label: "Cek Status" },
+  { href: "/",           label: "Beranda"    },
+  { href: "/activate",   label: "Aktivasi"   },
+  { href: "/status",     label: "Cek Status" },
+  { href: "/kalkulator", label: "Kalkulator" },
 ];
 
 export default function Header() {
