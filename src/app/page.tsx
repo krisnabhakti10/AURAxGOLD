@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+
+export const dynamic = "force-dynamic";
 
 /* ─── Data ──────────────────────────────────────────────── */
 const STEPS = [
@@ -122,7 +125,27 @@ const STATS = [
 ];
 
 /* ─── Page ──────────────────────────────────────────────── */
-export default function LandingPage() {
+const DEFAULT_LIVE_ACCOUNT = {
+  login_id: "257261514",
+  server: "Exness-MT5Real36",
+  investor_password: "AURAxGOLD1@",
+  description: null as string | null,
+};
+
+export default async function LandingPage() {
+  let liveAccount = DEFAULT_LIVE_ACCOUNT;
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("live_account")
+      .select("login_id, server, investor_password, description")
+      .eq("id", 1)
+      .single();
+    if (!error && data) liveAccount = data;
+  } catch {
+    // pakai nilai default jika Supabase error / table belum ada
+  }
+
   return (
     <>
     <div className="overflow-x-hidden">
@@ -355,21 +378,21 @@ export default function LandingPage() {
               {/* Login */}
               <div className="px-6 py-6 flex flex-col gap-1.5">
                 <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-600">Login ID</p>
-                <p className="text-xl font-mono font-bold text-gold-400 tracking-wider select-all">257261514</p>
+                <p className="text-xl font-mono font-bold text-gold-400 tracking-wider select-all">{liveAccount.login_id}</p>
                 <p className="text-[11px] text-zinc-600">MT5 Account Number</p>
               </div>
 
               {/* Server */}
               <div className="px-6 py-6 flex flex-col gap-1.5">
                 <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-600">Server</p>
-                <p className="text-base font-mono font-bold text-zinc-200 tracking-wide select-all">Exness-MT5Real36</p>
+                <p className="text-base font-mono font-bold text-zinc-200 tracking-wide select-all">{liveAccount.server}</p>
                 <p className="text-[11px] text-zinc-600">Broker Server</p>
               </div>
 
               {/* Password */}
               <div className="px-6 py-6 flex flex-col gap-1.5">
                 <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-600">Kata Sandi Investor</p>
-                <p className="text-base font-mono font-bold text-zinc-200 tracking-wide select-all">AURAxGOLD1@</p>
+                <p className="text-base font-mono font-bold text-zinc-200 tracking-wide select-all">{liveAccount.investor_password}</p>
                 <p className="text-[11px] text-zinc-600">Read-only · Tidak bisa trading</p>
               </div>
             </div>

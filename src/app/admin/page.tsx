@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect } from "react";
+import dynamic from "next/dynamic";
+
+const KalkulatorPanel = dynamic(() => import("@/app/kalkulator/page"), { ssr: false });
 
 /* ─── Types ─────────────────────────────────────────────── */
 type LicenseStatus = "pending" | "approved" | "rejected" | "revoked";
@@ -25,7 +28,7 @@ interface License {
 }
 
 /* ─── Exness Types ──────────────────────────────────────── */
-type MainTab = "licenses" | "exness";
+type MainTab = "licenses" | "exness" | "kalkulator" | "settings";
 
 interface ExnessClient {
   client_uid: string;
@@ -233,6 +236,11 @@ export default function AdminPage() {
   const [exError, setExError]         = useState("");
   const [exSearch, setExSearch]       = useState("");
 
+  /* ── Live Account Settings ── */
+  const [liveForm, setLiveForm]               = useState({ login_id: "", server: "", investor_password: "", description: "" });
+  const [liveLoading, setLiveLoading]         = useState(false);
+  const [liveFetched, setLiveFetched]         = useState(false);
+
   const showToast = (type: "success" | "error", msg: string) => {
     setToast({ type, msg });
     setTimeout(() => setToast(null), 3500);
@@ -282,6 +290,23 @@ export default function AdminPage() {
       fetchExnessStats(password);
     }
   }, [mainTab, authed, exStats, exLoading, password, fetchExnessStats]);
+
+  // Auto-load Live Account data ketika tab Settings dibuka
+  useEffect(() => {
+    if (mainTab === "settings" && authed && !liveFetched) {
+      setLiveLoading(true);
+      fetch("/api/admin/live-account", { headers: { "x-admin-pass": password } })
+        .then(r => r.json())
+        .then(d => {
+          if (d && d.login_id) {
+            setLiveForm({ login_id: d.login_id, server: d.server, investor_password: d.investor_password, description: d.description ?? "" });
+          }
+          setLiveFetched(true);
+        })
+        .catch(() => { setLiveFetched(true); })
+        .finally(() => setLiveLoading(false));
+    }
+  }, [mainTab, authed, liveFetched, password]);
 
   /* ── Derived counts (client-side expired logic) ── */
   const counts: Record<FilterTab, number> = useMemo(() => ({
@@ -366,8 +391,10 @@ export default function AdminPage() {
         {/* ══════════════════ MAIN TAB SWITCHER ══════════════════ */}
         <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-6 w-fit">
           {([
-            { key: "licenses", label: "📋 Manajemen Lisensi" },
-            { key: "exness",   label: "📊 Exness Monitor" },
+            { key: "licenses",   label: "📋 Manajemen Lisensi" },
+            { key: "exness",     label: "📊 Exness Monitor"    },
+            { key: "kalkulator", label: "💰 Kalkulator"        },
+            { key: "settings",   label: "⚙️ Pengaturan"        },
           ] as { key: MainTab; label: string }[]).map(({ key, label }) => (
             <button key={key} onClick={() => setMainTab(key)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
@@ -582,6 +609,151 @@ export default function AdminPage() {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {/* ══════════════════ KALKULATOR PANEL ══════════════════ */}
+        {mainTab === "kalkulator" && (
+          <div className="-mx-5 sm:-mx-8 -mb-10">
+            <KalkulatorPanel />
+          </div>
+        )}
+
+        {/* ══════════════════ SETTINGS PANEL ══════════════════ */}
+        {mainTab === "settings" && (
+          <div className="max-w-2xl space-y-6">
+
+            {/* Live Account Card */}
+            <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] overflow-hidden">
+              <div className="px-6 py-4 border-b border-white/[0.05] flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)" }}>
+                  <svg className="w-4 h-4 text-gold-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Akun Live Trading</h3>
+                  <p className="text-[11px] text-zinc-600">Data yang ditampilkan di landing page (section Transparansi)</p>
+                </div>
+              </div>
+
+              <div className="px-6 py-5 space-y-4">
+                {liveLoading ? (
+                  <div className="flex items-center justify-center py-8 gap-2">
+                    <Spinner className="w-5 h-5 text-gold-400" />
+                    <span className="text-zinc-500 text-sm">Memuat data…</span>
+                  </div>
+                ) : (
+                  <>
+                    {/* Login ID */}
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-400 mb-1.5 tracking-wide uppercase">Login ID (MT5 Account)</label>
+                      <input
+                        type="text"
+                        value={liveForm.login_id}
+                        onChange={e => setLiveForm(f => ({ ...f, login_id: e.target.value }))}
+                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2.5 text-white text-sm font-mono placeholder-zinc-700 focus:outline-none focus:border-gold-500/40 focus:bg-white/[0.06] transition-all"
+                        placeholder="cth: 257261514"
+                      />
+                    </div>
+
+                    {/* Server */}
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-400 mb-1.5 tracking-wide uppercase">Server Broker</label>
+                      <input
+                        type="text"
+                        value={liveForm.server}
+                        onChange={e => setLiveForm(f => ({ ...f, server: e.target.value }))}
+                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2.5 text-white text-sm font-mono placeholder-zinc-700 focus:outline-none focus:border-gold-500/40 focus:bg-white/[0.06] transition-all"
+                        placeholder="cth: Exness-MT5Real36"
+                      />
+                    </div>
+
+                    {/* Investor Password */}
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-400 mb-1.5 tracking-wide uppercase">Investor Password (Read-only)</label>
+                      <input
+                        type="text"
+                        value={liveForm.investor_password}
+                        onChange={e => setLiveForm(f => ({ ...f, investor_password: e.target.value }))}
+                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2.5 text-white text-sm font-mono placeholder-zinc-700 focus:outline-none focus:border-gold-500/40 focus:bg-white/[0.06] transition-all"
+                        placeholder="cth: AURAxGOLD1@"
+                      />
+                    </div>
+
+                    {/* Description (opsional) */}
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-400 mb-1.5 tracking-wide uppercase">Catatan / Keterangan <span className="normal-case font-normal text-zinc-600">(opsional)</span></label>
+                      <input
+                        type="text"
+                        value={liveForm.description}
+                        onChange={e => setLiveForm(f => ({ ...f, description: e.target.value }))}
+                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2.5 text-white text-sm placeholder-zinc-700 focus:outline-none focus:border-gold-500/40 focus:bg-white/[0.06] transition-all"
+                        placeholder="cth: Akun utama EA AURAxGOLD"
+                      />
+                    </div>
+
+                    {/* Preview */}
+                    <div className="rounded-lg border border-white/[0.05] bg-white/[0.01] p-4 space-y-2">
+                      <p className="text-[10px] font-bold tracking-widest text-zinc-600 uppercase mb-3">Preview tampilan landing page</p>
+                      <div className="grid grid-cols-3 gap-3 text-center">
+                        <div>
+                          <p className="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">Login ID</p>
+                          <p className="text-sm font-mono font-bold text-gold-400 truncate">{liveForm.login_id || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">Server</p>
+                          <p className="text-sm font-mono font-bold text-zinc-200 truncate">{liveForm.server || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">Password</p>
+                          <p className="text-sm font-mono font-bold text-zinc-200 truncate">{liveForm.investor_password || "—"}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Save button */}
+                    <div className="flex justify-end pt-1">
+                      <button
+                        disabled={liveLoading || !liveForm.login_id || !liveForm.server || !liveForm.investor_password}
+                        onClick={async () => {
+                          setLiveLoading(true);
+                          try {
+                            const res = await fetch("/api/admin/live-account", {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json", "x-admin-pass": password },
+                              body: JSON.stringify({ ...liveForm, description: liveForm.description || null }),
+                            });
+                            const d = await res.json();
+                            if (!res.ok) { showToast("error", d.error ?? "Gagal menyimpan."); return; }
+                            showToast("success", "✅ Data akun live berhasil diperbarui!");
+                          } catch { showToast("error", "Gagal menghubungi server."); }
+                          finally { setLiveLoading(false); }
+                        }}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.25)", color: "rgb(252,191,7)" }}
+                      >
+                        {liveLoading ? (
+                          <>
+                            <Spinner className="w-4 h-4" />
+                            Menyimpan…
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Simpan Perubahan
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
           </div>
         )}
 
